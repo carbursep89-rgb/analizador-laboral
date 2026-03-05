@@ -8,7 +8,7 @@ import { exportarExcel } from "@/lib/exportar";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
-const PROMPT_SISTEMA = Eres un experto en cumplimiento laboral en Chile (Ley 20.123).
+const PROMPT_SISTEMA = `Eres un experto en cumplimiento laboral en Chile (Ley 20.123).
 Con base en los datos extraídos, genera un JSON con este formato EXACTO (sin texto adicional):
 
 {
@@ -49,7 +49,7 @@ REGLAS CRÍTICAS:
 - COMPARACIÓN NÓMINAS: compara RUTs entre períodos. Los que están en período anterior pero NO en el actual = desvinculados
 - Cruza siempre por RUT, nunca por nombre
 - Agrega alerta "informativo" indicando qué documentos NO fueron cargados
-- Responde SOLO con el JSON;
+- Responde SOLO con el JSON`;
 
 function Pill({ children, color = "#3b82f6" }) {
   return (
