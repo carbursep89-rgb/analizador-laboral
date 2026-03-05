@@ -5,7 +5,7 @@ const config = {
   alerta:     { label: "⚠ Verificar",  bg: "#fef9c3", color: "#854d0e", border: "#fde047" },
   ausente:    { label: "✗ Ausente",    bg: "#fee2e2", color: "#991b1b", border: "#fca5a5" },
   sin_firma:  { label: "⚠ Sin firma",  bg: "#fef9c3", color: "#854d0e", border: "#fde047" },
-  "N/A":      { label: "—",            bg: "#f1f5f9", color: "#64748b", border: "#cbd5e1" },
+  no_verificado: { label: "? Sin doc", bg: "#1e1b4b", color: "#a5b4fc", border: "#4f46e5" },
   firmado:    { label: "✓ Firmado",    bg: "#dcfce7", color: "#166534", border: "#86efac" },
   notificado: { label: "✓ Notificado", bg: "#dbeafe", color: "#1e40af", border: "#93c5fd" },
   pendiente:  { label: "✗ Pendiente",  bg: "#fee2e2", color: "#991b1b", border: "#fca5a5" },
