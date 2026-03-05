@@ -445,6 +445,7 @@ export default function App() {
           ]
         }], 3000);
         contextoAcumulado += `\n\n=== ${f.name} ===\n${texto}`;
+await new Promise(r => setTimeout(r, 8000));
       }
 
       setProgreso({ actual: archivos.length, total: archivos.length + 1, mensaje: "Generando resumen final..." });
