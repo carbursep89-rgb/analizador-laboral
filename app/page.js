@@ -40,7 +40,15 @@ Con base en los datos extraídos, genera un JSON con este formato EXACTO (sin te
   }],
   "alertas": [{ "nivel": "critico|atencion|informativo", "mensaje": "" }]
 }
-Reglas: cruza por RUT, AFP N/A = alerta, sin notaria = alerta atencion, Previred = ok, carta DT = finiquito. Solo JSON.`;
+Reglas:
+- COMPARACIÓN DE NÓMINAS: Si tienes datos de dos períodos (ej: dic 2025 y ene 2026), compara AMBAS listas de trabajadores por RUT. Los que aparecen en el período anterior pero NO en el período actual son DESVINCULADOS — agrégalos en el array desvinculados.
+- Cruza siempre por RUT, no por nombre
+- AFP N/A = estado alerta
+- Sin notaria = alerta atencion  
+- Previred = cotizacion ok
+- Carta DT = equivalente a finiquito
+- Si no hay finiquito ni carta para un desvinculado = estado pendiente
+- Responde SOLO con el JSON`;
 
 function Pill({ children, color = "#3b82f6" }) {
   return (
