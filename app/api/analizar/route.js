@@ -1,13 +1,21 @@
-// app/api/analizar/route.js
-// Procesa archivos en lotes para evitar el límite de 4.5MB de Vercel
-
 import { NextResponse } from "next/server";
 
 export const maxDuration = 60;
 
 const PROMPT_SISTEMA = `Eres un experto en gestión de recursos humanos y cumplimiento laboral en Chile, especializado en contratos de obra y subcontratación bajo la Ley 20.123.
 
-Analiza los documentos laborales adjuntos y entrega un JSON estructurado con el siguiente formato EXACTO (sin texto adicional, solo JSON válido):
+Analiza el documento adjunto y extrae en texto plano todos los datos que encuentres:
+- Nombres completos y RUTs de trabajadores
+- Estado de cotizaciones (AFP, salud, mutual, caja compensación, seguro social)
+- Períodos, montos, instituciones
+- Finiquitos, causales de término, fechas
+- Cualquier dato laboral relevante
+
+Sé exhaustivo. Responde solo con el texto extraído, sin JSON.`;
+
+const PROMPT_FINAL = `Eres un experto en cumplimiento laboral en Chile (Ley 20.123).
+
+Con base en los datos extraídos de múltiples documentos laborales, genera un JSON con este formato EXACTO (sin texto adicional):
 
 {
   "empresa": {
@@ -66,43 +74,19 @@ Analiza los documentos laborales adjuntos y entrega un JSON estructurado con el 
 }
 
 Reglas:
-1. Trabaja SIEMPRE con los datos exactos de los documentos. No inferas ni supongas.
-2. Cruza por RUT para identificar trabajadores.
-3. AFP N/A en liquidacion = estado alerta.
-4. Finiquito sin ratificacion notarial = alerta atencion.
-5. Cotizaciones con comprobante Previred = ok.
-6. Carta Direccion del Trabajo = equivalente a finiquito.
-7. Trabajadores con termino dentro del periodo = estado Termino periodo.
-8. Responde UNICAMENTE con el JSON, sin texto antes ni despues.`;
+- Cruza por RUT para identificar trabajadores
+- AFP N/A = estado alerta
+- Finiquito sin notaria = alerta atencion
+- Comprobante Previred = cotizacion ok
+- Carta DT = equivalente a finiquito
+- Responde SOLO con el JSON`;
 
 export async function POST(request) {
   try {
-    const { archivos } = await request.json();
+    const { archivo, nombre, fase, contexto } = await request.json();
 
-    if (!archivos || archivos.length === 0) {
-      return NextResponse.json({ error: "No se recibieron archivos" }, { status: 400 });
-    }
-
-    // Procesar en lotes de 2 archivos para no superar límites
-    const LOTE = 2;
-    let contextoAcumulado = "";
-    let resultadoFinal = null;
-
-    for (let i = 0; i < archivos.length; i += LOTE) {
-      const lote = archivos.slice(i, i + LOTE);
-      const esUltimo = i + LOTE >= archivos.length;
-
-      const contentParts = lote.map((f) => ({
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: f.base64 },
-      }));
-
-      const instruccion = esUltimo
-        ? `Lote final. Contexto previo: ${contextoAcumulado || "ninguno"}. Analiza todo y entrega el JSON completo.`
-        : `Lote ${Math.floor(i / LOTE) + 1}. Extrae datos clave en texto plano (trabajadores, RUTs, cotizaciones, finiquitos). NO generes JSON aún.`;
-
-      contentParts.push({ type: "text", text: instruccion });
-
+    // FASE 1: extraer datos de un archivo individual
+    if (fase === "extraer") {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -112,29 +96,59 @@ export async function POST(request) {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: esUltimo ? 8000 : 3000,
+          max_tokens: 3000,
           system: PROMPT_SISTEMA,
-          messages: [{ role: "user", content: contentParts }],
+          messages: [{
+            role: "user",
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: archivo } },
+              { type: "text", text: `Extrae todos los datos laborales de este documento: ${nombre}` }
+            ]
+          }]
         }),
       });
 
       if (!res.ok) {
         const err = await res.text();
-        return NextResponse.json({ error: "Error API Claude: " + err }, { status: 500 });
+        return NextResponse.json({ error: err }, { status: 500 });
       }
-
       const data = await res.json();
-      const texto = data.content?.map((b) => b.text || "").join("") || "";
-
-      if (esUltimo) {
-        const clean = texto.replace(/```json|```/g, "").trim();
-        resultadoFinal = JSON.parse(clean);
-      } else {
-        contextoAcumulado += `\n\n--- Lote ${Math.floor(i / LOTE) + 1} ---\n${texto}`;
-      }
+      const texto = data.content?.map(b => b.text || "").join("") || "";
+      return NextResponse.json({ texto });
     }
 
-    return NextResponse.json({ resultado: resultadoFinal });
+    // FASE 2: generar JSON final con todo el contexto acumulado
+    if (fase === "consolidar") {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 8000,
+          system: PROMPT_FINAL,
+          messages: [{
+            role: "user",
+            content: `Datos extraídos de todos los documentos:\n\n${contexto}\n\nGenera el JSON de análisis completo.`
+          }]
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        return NextResponse.json({ error: err }, { status: 500 });
+      }
+      const data = await res.json();
+      const texto = data.content?.map(b => b.text || "").join("") || "";
+      const clean = texto.replace(/```json|```/g, "").trim();
+      const resultado = JSON.parse(clean);
+      return NextResponse.json({ resultado });
+    }
+
+    return NextResponse.json({ error: "Fase no reconocida" }, { status: 400 });
 
   } catch (error) {
     console.error("Error:", error);
