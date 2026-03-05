@@ -144,4 +144,4 @@ Para adaptar el prompt de análisis, edita el archivo `app/api/analizar/route.js
 
 ---
 
-*Desarrollado para RLX Ingeniería y Construcción S.A.*
+*Desarrollado por Carlos Burgos Sepulveda (Ingeniero Constructor) OOCC SSVSA*
