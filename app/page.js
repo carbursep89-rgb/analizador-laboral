@@ -8,17 +8,9 @@ import { exportarExcel } from "@/lib/exportar";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 
-const PROMPT_SISTEMA = `Eres un experto en gestión de recursos humanos y cumplimiento laboral en Chile, especializado en contratos de obra y subcontratación bajo la Ley 20.123.
-Analiza el documento adjunto y extrae en texto plano todos los datos que encuentres:
-- Nombres completos y RUTs de trabajadores
-- Estado de cotizaciones (AFP, salud, mutual, caja compensación, seguro social)
-- Períodos, montos, instituciones
-- Finiquitos, causales de término, fechas
-- Cualquier dato laboral relevante
-Sé exhaustivo. Responde solo con el texto extraído, sin JSON.`;
-
-const PROMPT_FINAL = `Eres un experto en cumplimiento laboral en Chile (Ley 20.123).
+const PROMPT_SISTEMA = Eres un experto en cumplimiento laboral en Chile (Ley 20.123).
 Con base en los datos extraídos, genera un JSON con este formato EXACTO (sin texto adicional):
+
 {
   "empresa": { "razon_social": "", "rut": "", "obra": "", "periodo": "", "empresa_principal": "" },
   "resumen": {
@@ -29,26 +21,35 @@ Con base en los datos extraídos, genera un JSON con este formato EXACTO (sin te
   "trabajadores": [{
     "numero": 1, "rut": "", "nombre": "", "cargo": "", "estado": "Activo|Término período",
     "liquidacion": "ok|ausente|sin_firma",
-    "afp": { "institucion": "", "estado": "ok|alerta|ausente" },
-    "salud": { "institucion": "", "estado": "ok|ausente" },
-    "mutual": "ok|ausente", "caja_comp": "ok|ausente", "seg_social": "ok|ausente",
-    "finiquito": "N/A|firmado|notificado|pendiente", "causal_termino": "", "observaciones": ""
+    "afp": { "institucion": "", "estado": "ok|alerta|ausente|no_verificado" },
+    "salud": { "institucion": "", "estado": "ok|ausente|no_verificado" },
+    "mutual": "ok|ausente|no_verificado",
+    "caja_comp": "ok|ausente|no_verificado",
+    "seg_social": "ok|ausente|no_verificado",
+    "finiquito": "N/A|firmado|notificado|pendiente",
+    "causal_termino": "", "observaciones": ""
   }],
   "desvinculados": [{
     "numero": 1, "rut": "", "nombre": "", "ultima_nomina": "",
-    "estado_finiquito": "firmado|notificado|pendiente", "tipo_documento": "", "causal": ""
+    "estado_finiquito": "firmado|notificado|pendiente",
+    "tipo_documento": "", "causal": ""
   }],
   "alertas": [{ "nivel": "critico|atencion|informativo", "mensaje": "" }]
 }
-Reglas:
-- COMPARACIÓN DE NÓMINAS: Si tienes datos de dos períodos (ej: dic 2025 y ene 2026), compara AMBAS listas de trabajadores por RUT. Los que aparecen en el período anterior pero NO en el período actual son DESVINCULADOS — agrégalos en el array desvinculados.
-- Cruza siempre por RUT, no por nombre
-- AFP N/A = estado alerta
-- Sin notaria = alerta atencion  
-- Previred = cotizacion ok
-- Carta DT = equivalente a finiquito
-- Si no hay finiquito ni carta para un desvinculado = estado pendiente
-- Responde SOLO con el JSON`;
+
+REGLAS CRÍTICAS:
+- NUNCA marques algo como "ok" si no tienes el documento que lo acredita
+- Si no se cargaron liquidaciones de sueldo → liquidacion = "ausente" para todos
+- Si no se cargaron comprobantes Previred AFP → afp.estado = "no_verificado" para todos
+- Si no se cargaron comprobantes Previred Salud → salud.estado = "no_verificado" para todos
+- Si no se cargaron comprobantes Mutual → mutual = "no_verificado" para todos
+- Si no se cargaron comprobantes Caja Compensación → caja_comp = "no_verificado" para todos
+- Si no se cargaron comprobantes Seguro Social → seg_social = "no_verificado" para todos
+- Si no hay finiquito ni carta para un desvinculado → estado_finiquito = "pendiente"
+- COMPARACIÓN NÓMINAS: compara RUTs entre períodos. Los que están en período anterior pero NO en el actual = desvinculados
+- Cruza siempre por RUT, nunca por nombre
+- Agrega alerta "informativo" indicando qué documentos NO fueron cargados
+- Responde SOLO con el JSON;
 
 function Pill({ children, color = "#3b82f6" }) {
   return (
