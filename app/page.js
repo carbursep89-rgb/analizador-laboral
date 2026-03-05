@@ -455,8 +455,24 @@ await new Promise(r => setTimeout(r, 8000));
         content: `Datos extraídos:\n${contextoAcumulado}\n\nGenera el JSON completo.`
       }], 8000);
 
-      const clean = jsonTexto.replace(/```json|```/g, "").trim();
-      const resultadoFinal = JSON.parse(clean);
+      let clean = jsonTexto.replace(/```json|```/g, "").trim();
+// Extraer solo el bloque JSON si hay texto adicional
+const jsonMatch = clean.match(/\{[\s\S]*\}/);
+if (jsonMatch) clean = jsonMatch[0];
+// Limpiar caracteres problemáticos
+clean = clean
+  .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+  .replace(/,(\s*[}\]])/g, "$1")
+  .replace(/'/g, '"');
+let resultadoFinal;
+try {
+  resultadoFinal = JSON.parse(clean);
+} catch(e) {
+  // Intentar reparar JSON truncado
+  clean = clean.replace(/,\s*$/, "");
+  if (!clean.endsWith("}")) clean += "}}";
+  resultadoFinal = JSON.parse(clean);
+}
 
       setResultado(resultadoFinal);
       setHistorial((prev) => [{
