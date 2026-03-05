@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Analizador Laboral | RLX Ingeniería",
+  title: "Analizador Laboral | OBRAS CIVILES SSVSA",
   description: "Análisis automático de documentación laboral para obras de construcción",
 };
 
